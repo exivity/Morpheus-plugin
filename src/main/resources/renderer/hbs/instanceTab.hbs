@@ -1,0 +1,263 @@
+
+<script nonce="{{nonce ''}}">
+    document.addEventListener('DOMContentLoaded', function() {
+        const reportForm = document.getElementById('reportDateForm');
+        const quickSelectButtons = document.querySelectorAll('[data-range]');
+        
+        function getMorpheusToken() {
+            const metaToken = document.querySelector('meta[name="_csrf"]');
+            return metaToken ? metaToken.getAttribute('content') : '';
+        }
+
+        // Function to format date as YYYY-MM-DD
+        function formatDate(date) {
+            return date.toISOString().split('T')[0];
+        }
+
+        // Function to calculate date range
+        function calculateDateRange(days) {
+            const endDate = new Date();
+            const startDate = new Date();
+            startDate.setDate(startDate.getDate() - days);
+            return {
+                startDate: formatDate(startDate),
+                endDate: formatDate(endDate)
+            };
+        }
+
+        // Function to update dates
+        async function updateDates(startDate, endDate) {
+            try {
+                //const csrfToken = getMorpheusToken();
+                //console.log(csrfToken);
+                const response = await fetch(`/plugin/ExivityPluginController/json`, {  ///plugin/instances/{{instance.id}}/dates
+                    method: 'POST',
+                 //   headers: {
+                 //       'Content-Type': 'application/json',
+                 //       'Accept': 'application/json'
+                 //   },
+                    body: JSON.stringify({
+                        startDate: startDate,
+                        endDate: endDate
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showNotification('Date range updated successfully');
+                    window.location.reload(); // Reload to show updated data
+                } else {
+                    showNotification(result.msg || 'Failed to update date range', true);
+                }
+            } catch (error) {
+                console.error('Error updating dates:', error);
+                showNotification('Error updating date range', true);
+            }
+        }
+
+        // Add click handlers for quick select buttons
+        quickSelectButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const days = parseInt(this.dataset.range);
+                const dates = calculateDateRange(days);
+                
+                // Update input fields
+                document.getElementById('startDate').value = dates.startDate;
+                document.getElementById('endDate').value = dates.endDate;
+                
+                // Trigger the update
+                updateDates(dates.startDate, dates.endDate);
+            });
+        });
+
+        // Handle form submission for custom date range
+        if (reportForm) {
+            reportForm.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                
+                const startDate = document.getElementById('startDate').value;
+                const endDate = document.getElementById('endDate').value;
+                
+                if (!startDate || !endDate) {
+                    showNotification('Please select both start and end dates', true);
+                    return;
+                }
+                
+                if (new Date(startDate) > new Date(endDate)) {
+                    showNotification('Start date cannot be after end date', true);
+                    return;
+                }
+
+                await updateDates(startDate, endDate);
+            });
+        }
+
+        // Store initial date values
+        window.initialStartDate = document.getElementById('startDate').value;
+        window.initialEndDate = document.getElementById('endDate').value;
+    });
+
+    // Update date change event listeners to use the new updateDates function
+    document.getElementById('startDate').addEventListener('change', function() {
+        const startDate = this.value;
+        const endDate = document.getElementById('endDate').value;
+        if (startDate && endDate && startDate !== window.initialStartDate) {
+            document.getElementById('reportDateForm').dispatchEvent(new Event('submit'));
+        }
+    });
+
+    document.getElementById('endDate').addEventListener('change', function() {
+        const startDate = document.getElementById('startDate').value;
+        const endDate = this.value;
+        if (startDate && endDate && endDate !== window.initialEndDate) {
+            document.getElementById('reportDateForm').dispatchEvent(new Event('submit'));
+        }
+    });
+
+    function showNotification(message, isError = false) {
+        const container = document.getElementById('notificationContainer');
+        const notification = document.createElement('div');
+        notification.className = `alert ${isError ? 'alert-danger' : 'alert-success'}`;
+        notification.textContent = message;
+        
+        container.innerHTML = '';
+        container.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.remove();
+        }, 3000);
+    }
+</script>
+
+
+
+<h1 style="text-align: center; font-size: 36px;">FinOps Overview</h1>
+
+<br>
+
+<!--
+<h1>Exivity Instance</h1>
+<iframe id="loginFrame" src="{{exivityUrl}}" title="Exivity Instance" width="100%" height="600px" frameborder="0"></iframe>
+
+<!-- <script src="{{asset "/exivity.js"}}" nonce="{{nonce ""}}" ></script> -->
+
+<!-- HTML for the date controls -->
+<div id="notificationContainer" class="mb-4"></div>
+
+<div class="date-controls mb-4">
+    <div class="flex items-center space-x-4">
+        <!-- Quick select buttons -->
+        <div class="btn-group mr-4">
+            <button type="button" class="btn btn-default" data-range="7">Last 7 Days</button>
+            <button type="button" class="btn btn-default" data-range="30">Last 30 Days</button>
+            <button type="button" class="btn btn-default" data-range="90">Last 90 Days</button>
+        </div>
+        
+        <!-- Custom date range form -->
+        <form id="reportDateForm" class="flex items-center space-x-4">
+            <div class="form-group">
+                <label for="startDate">Start:</label>
+                <input type="date" id="startDate" name="startDate" class="form-control" value="{{startDate}}" required>
+            </div>
+            <div class="form-group">
+                <label for="endDate">End:</label>
+                <input type="date" id="endDate" name="endDate" class="form-control" value="{{endDate}}" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Update Report</button>
+        </form>
+    </div>
+</div>
+
+<br>
+
+{{#if authSuccess}}
+    <h2>FinOps Report Data for Instance {{instance.getUuid}}</h2>
+    <table class="table table-bordered table-striped">
+        <thead>
+            <tr>
+                <th>Instance Key</th>
+                <th>Instance Name</th>
+                <th>Current Status</th>
+                <th>Service</th>
+                <th>Rate</th>
+                <th>Total Quantity</th>
+                <th>Total COGS</th>
+                <th>Total Charge</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{#each reportData.meta.report}}
+                {{#if account_key}}
+                        <tr>
+                            <td>{{account_key}}</td>
+                            <td>{{account_name}}</td>
+                            <td>{{../instance.status}}</td>
+                            <td>{{service_description}}</td>
+                            <td>{{avg_unit_based_rate}}</td>
+                            <td>{{total_quantity}}</td>
+                            <td>{{total_cogs}}</td>
+                            <td>{{total_charge}}</td>
+                        </tr>
+                {{/if}}
+            {{/each}}
+        </tbody>
+    </table>
+{{else}}
+    <div class="alert alert-danger">
+        <strong>Authentication Error</strong>
+        <p>Failed to authenticate with Exivity API</p>
+        <strong>Configured Exivity URL:</strong> <span id="exivityUrl">{{exivityUrl}}</span><br>
+        <strong>Username:</strong> <span id="exivityUsername">{{exivityUsername}}</span>
+        <dl>
+            <dt>Error Message:</dt>
+            <dd>{{authErrorMessage}}</dd>
+            {{#if authResponseCode}}
+                <dt>Response Code:</dt>
+                <dd>{{authResponseCode}}</dd>
+            {{/if}}
+        </dl>
+    </div>
+{{/if}}
+
+
+<div>
+
+</div>
+
+<div style="text-align: center; margin-top: 20px;">
+    <a href="{{exivityUrl}}" target="_blank" class="pretty-button">
+        Access Exivity
+    </a>
+</div>
+
+<style>
+    .pretty-button {
+        /* Basic button styling */
+        display: inline-block;
+        padding: 10px 20px;
+        font-size: 16px;
+        text-decoration: none;
+        color: #ffffff;
+        background-color: #4CAF50; /* Green background */
+        border: none;
+        border-radius: 5px;
+        transition: all 0.3s ease 0s;
+        cursor: pointer;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .pretty-button:hover {
+        /* Hover effect */
+        background-color: #45a049; /* Darker green on hover */
+        transform: translateY(-2px);
+        box-shadow: 0 6px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .pretty-button:active {
+        /* Active state */
+        background-color: #3e8e41;
+        transform: translateY(1px);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+</style>

@@ -1,0 +1,302 @@
+<h1 style="text-align: center; font-size: 36px;">FinOps Analytics Dashboard</h1>
+
+<br>
+
+{{#if authSuccess}}
+<div class="break-container intro-stats">
+			<div class="count-stats">
+				
+					<div class="stats-container">
+						<span class="big-stat">
+							
+								1
+							
+						</span>
+						<div class="stat-label">Placeholder</div>
+					</div>
+				
+					<div class="stats-container">
+						<span class="big-stat">
+							
+								$460
+							
+						</span>
+						<div class="stat-label">Placeholder</div>
+					</div>
+				
+					<div class="stats-container">
+						<span class="big-stat">
+							
+								$579
+							
+						</span>
+						<div class="stat-label">Placeholder</div>
+					</div>
+				
+					<div class="stats-container">
+						<span class="big-stat">
+							
+								1
+							
+						</span>
+						<div class="stat-label">Placeholder</div>
+					</div>
+				
+					<div class="stats-container">
+						<span class="big-stat">
+							
+								1
+							
+						</span>
+						<div class="stat-label">Placeholder</div>
+					</div>
+				
+			</div>
+		</div>
+
+<div class="buffer-container">
+  <h3 class="center">Total Cost By Service</h3>
+  <div 
+    class="auto-google-pie-chart" 
+    data-chart="{{chartData}}" 
+    data-target="analytics-chart-services" 
+    data-code="services"
+  >
+    <div id="analytics-chart-services" style="width: 280px; height: 280px;"></div>
+  </div>
+  <div class="chart-legend">
+    <table class="chart-legend-table">
+      <tbody>
+        {{#each serviceCosts}}
+          <tr>
+            <td class="legend-cell">
+              <div style="background-color:#396ab1;"></div>
+            </td>
+            <td>{{this.[0]}}</td>
+            <td class="number-cell">${{this.[1]}}</td>
+          </tr>
+        {{/each}}
+      </tbody>
+    </table>
+  </div>
+</div>
+<br>
+{{/if}}
+
+<div id="notificationContainer" class="mb-4"></div>
+
+<div class="date-controls mb-4">
+    <div class="flex items-center space-x-4">
+        <!-- Quick select buttons -->
+        <div class="btn-group mr-4">
+            <button type="button" class="btn btn-default" data-range="7">Last 7 Days</button>
+            <button type="button" class="btn btn-default" data-range="30">Last 30 Days</button>
+            <button type="button" class="btn btn-default" data-range="90">Last 90 Days</button>
+        </div>
+        
+        <!-- Custom date range form -->
+        <form id="reportDateForm" class="flex items-center space-x-4">
+            <div class="form-group">
+                <label for="startDate">Start:</label>
+                <input type="date" id="startDate" name="startDate" class="form-control" value="{{startDate}}" required>
+            </div>
+            <div class="form-group">
+                <label for="endDate">End:</label>
+                <input type="date" id="endDate" name="endDate" class="form-control" value="{{endDate}}" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Update Report</button>
+        </form>
+    </div>
+</div>
+
+
+
+<br>
+
+{{#if authSuccess}}
+
+    <h2>FinOps Report Data</h2>
+    <table class="table table-bordered table-striped">
+        <thead>
+            <tr>
+                <th>Instance Key</th>
+                <th>Instance Name</th>
+                <th>Service</th>
+                <th>Rate</th>
+                <th>Total Quantity</th>
+                <th>Total COGS</th>
+                <th>Total Charge</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{#each reportData.meta.report}}
+                {{#if account_key}}
+                    <tr>
+                        <td>{{account_key}}</td>
+                        <td>{{account_name}}</td>
+                        <td>{{service_description}}</td>
+                        <td>{{avg_unit_based_rate}}</td>
+                        <td>{{total_quantity}}</td>
+                        <td>{{total_cogs}}</td>
+                        <td>{{total_charge}}</td>
+                    </tr>
+                {{/if}}
+            {{/each}}
+        </tbody>
+    </table>
+
+{{else}}
+    <div class="alert alert-danger">
+        <strong>Authentication Error</strong>
+        <p>Failed to authenticate with Exivity API</p>
+        <strong>Configured Exivity URL:</strong> <span id="exivityUrl">{{exivityUrl}}</span><br>
+        <strong>Username:</strong> <span id="exivityUsername">{{exivityUsername}}</span>
+        <dl>
+            <dt>Error Message:</dt>
+            <dd>{{authErrorMessage}}</dd>
+            {{#if authResponseCode}}
+                <dt>Response Code:</dt>
+                <dd>{{authResponseCode}}</dd>
+            {{/if}}
+        </dl>
+    </div>
+{{/if}}
+
+<script>
+    (function() {
+        document.addEventListener('DOMContentLoaded', function() {
+            const reportForm = document.getElementById('reportDateForm');
+            const quickSelectButtons = document.querySelectorAll('[data-range]');
+            
+            // Function to format date as YYYY-MM-DD
+            function formatDate(date) {
+                return date.toISOString().split('T')[0];
+            }
+
+            // Function to calculate date range
+            function calculateDateRange(days) {
+                const endDate = new Date();
+                const startDate = new Date();
+                startDate.setDate(startDate.getDate() - days);
+                return {
+                    startDate: formatDate(startDate),
+                    endDate: formatDate(endDate)
+                };
+            }
+
+            // Function to update dates
+            async function updateDates(startDate, endDate) {
+                try {
+                    const response = await fetch(`/plugin/ExivityPluginController/json`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            startDate: startDate,
+                            endDate: endDate
+                        })
+                    });
+
+                    const result = await response.json();
+                    
+                    if (response.ok) {
+                        showNotification('Date range updated successfully');
+                        window.location.reload();
+                    } else {
+                        showNotification(result.msg || 'Failed to update date range', true);
+                    }
+                } catch (error) {
+                    console.error('Error updating dates:', error);
+                    showNotification('Error updating date range', true);
+                }
+            }
+
+            // Add click handlers for quick select buttons
+            quickSelectButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const days = parseInt(this.dataset.range);
+                    const dates = calculateDateRange(days);
+                    
+                    document.getElementById('startDate').value = dates.startDate;
+                    document.getElementById('endDate').value = dates.endDate;
+                    
+                    updateDates(dates.startDate, dates.endDate);
+                });
+            });
+
+            // Handle form submission
+            if (reportForm) {
+                reportForm.addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    
+                    const startDate = document.getElementById('startDate').value;
+                    const endDate = document.getElementById('endDate').value;
+                    
+                    if (!startDate || !endDate) {
+                        showNotification('Please select both start and end dates', true);
+                        return;
+                    }
+                    
+                    if (new Date(startDate) > new Date(endDate)) {
+                        showNotification('Start date cannot be after end date', true);
+                        return;
+                    }
+
+                    await updateDates(startDate, endDate);
+                });
+            }
+        });
+
+        function showNotification(message, isError = false) {
+            const container = document.getElementById('notificationContainer');
+            const notification = document.createElement('div');
+            notification.className = `alert ${isError ? 'alert-danger' : 'alert-success'}`;
+            notification.textContent = message;
+            
+            container.innerHTML = '';
+            container.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+    })();
+</script>
+
+<style>
+.intro-stats .count-stats {
+    display: -webkit-flex;
+    display: -moz-flex;
+    display: -ms-flexbox;
+    display: -ms-flex;
+    display: flex;
+    -webkit-flex-direction: row;
+    -moz-flex-direction: row;
+    -ms-flex-direction: row;
+    flex-direction: row;
+    -webkit-justify-content: space-around;
+    -moz-justify-content: space-around;
+    -ms-justify-content: space-around;
+    -ms-flex-pack: justify;
+    justify-content: space-around;
+}
+
+.intro-stats .count-stats div .big-stat {
+    text-align: center;
+    font-size: 32px;
+    padding-bottom: 0;
+    line-height: 35px;
+    display: block;
+    margin-top: 19px;
+}
+
+.intro-stats .count-stats div .stat-label {
+    font-size: 15px;
+    text-align: center;
+    text-transform: uppercase;
+    display: block;
+}
+
+</style>
