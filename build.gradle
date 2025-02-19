@@ -1,0 +1,71 @@
+buildscript {
+	repositories {
+		mavenLocal()
+		mavenCentral()
+	}
+	dependencies {
+		classpath "com.bertramlabs.plugins:asset-pipeline-gradle:$assetPipelineVersion"
+	}
+}
+
+apply plugin: 'com.github.johnrengelman.shadow'
+
+apply plugin: 'java'
+apply plugin: 'groovy'
+apply plugin: 'idea'
+apply plugin: 'maven-publish'
+apply plugin: 'asset-pipeline'
+
+group = 'com.exivity'
+version '0.0.47'
+
+sourceCompatibility = '1.11'
+targetCompatibility = '1.11'
+
+repositories {
+	mavenLocal()
+	mavenCentral()
+}
+
+configurations {
+	provided
+}
+
+dependencies {
+	provided "com.morpheusdata:morpheus-plugin-api:1.1.9"
+    provided "org.codehaus.groovy:groovy-all:3.0.10"
+    implementation "org.slf4j:slf4j-api:1.7.36"
+    implementation "org.slf4j:slf4j-parent:1.7.36"
+}
+
+sourceSets {
+	main {
+		compileClasspath += configurations.provided
+	}
+}
+
+assets {
+	packagePlugin = false
+}
+
+jar {
+	archiveBaseName = 'exivity-tab-plugin'
+	manifest {
+		attributes(
+				'Plugin-Class': 'com.exivity.tab.TabPlugin',
+				'Plugin-Version': archiveVersion.get()
+		)
+	}
+}
+
+java {
+	withSourcesJar()
+	withJavadocJar()
+}
+
+tasks.withType(com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar) {
+	archiveBaseName = 'exivity-tab-plugin'
+	destinationDirectory = file("$rootDir/plugins")
+}
+
+tasks.assemble.dependsOn tasks.shadowJar
