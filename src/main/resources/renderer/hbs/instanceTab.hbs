@@ -1,12 +1,23 @@
-
-<script nonce="{{nonce ''}}">
-    document.addEventListener('DOMContentLoaded', function() {
+<script nonce="{{nonce}}">
+    document.addEventListener('DOMContentLoaded', function () {
         const reportForm = document.getElementById('reportDateForm');
         const quickSelectButtons = document.querySelectorAll('[data-range]');
-        
-        function getMorpheusToken() {
-            const metaToken = document.querySelector('meta[name="_csrf"]');
-            return metaToken ? metaToken.getAttribute('content') : '';
+        const storedStartDate = sessionStorage.getItem('instanceTabStartDate');
+        const storedEndDate = sessionStorage.getItem('instanceTabEndDate');
+        const startDateInput = document.getElementById('startDate');
+        const endDateInput = document.getElementById('endDate');
+
+        if (
+            storedStartDate &&
+            storedEndDate &&
+            (storedStartDate != startDateInput.value && storedEndDate != endDateInput.value)
+        ) {
+            startDateInput.value = storedStartDate;
+            endDateInput.value = storedEndDate;
+
+            // Immediately trigger a report update with stored dates
+            updateDates(storedStartDate, storedEndDate);
+            showNotification('Reload to update report data');
         }
 
         // Function to format date as YYYY-MM-DD
@@ -25,71 +36,73 @@
             };
         }
 
-        // Function to update dates
         async function updateDates(startDate, endDate) {
             try {
-                //const csrfToken = getMorpheusToken();
-                //console.log(csrfToken);
-                const response = await fetch(`/plugin/ExivityPluginController/json`, {  ///plugin/instances/{{instance.id}}/dates
-                    method: 'POST',
-                 //   headers: {
-                 //       'Content-Type': 'application/json',
-                 //       'Accept': 'application/json'
-                 //   },
-                    body: JSON.stringify({
-                        startDate: startDate,
-                        endDate: endDate
-                    })
-                });
+                // Store dates in sessionStorage for persistence between page loads
+                sessionStorage.setItem('instanceTabStartDate', startDate);
+                sessionStorage.setItem('instanceTabEndDate', endDate);
+
+                const response = await fetch(
+                    `/plugin/ExivityPluginController/dates?startDate=${startDate}&endDate=${endDate}&instanceId={{instance.id}}`,
+                    {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            Accept: 'application/json'
+                        }
+                    }
+                );
 
                 const result = await response.json();
-                
+
                 if (response.ok) {
                     showNotification('Date range updated successfully');
-                    window.location.reload(); // Reload to show updated data
                 } else {
-                    showNotification(result.msg || 'Failed to update date range', true);
+                    //showNotification(result.msg || 'Failed to update date range', true);
+                    //window.location.reload();
                 }
             } catch (error) {
                 console.error('Error updating dates:', error);
-                showNotification('Error updating date range', true);
+                //showNotification('Error updating date range', true);
             }
         }
 
         // Add click handlers for quick select buttons
-        quickSelectButtons.forEach(button => {
-            button.addEventListener('click', function() {
+        quickSelectButtons.forEach((button) => {
+            button.addEventListener('click', function () {
                 const days = parseInt(this.dataset.range);
                 const dates = calculateDateRange(days);
-                
+
                 // Update input fields
                 document.getElementById('startDate').value = dates.startDate;
                 document.getElementById('endDate').value = dates.endDate;
-                
+
                 // Trigger the update
                 updateDates(dates.startDate, dates.endDate);
+                window.location.reload();
             });
         });
 
         // Handle form submission for custom date range
         if (reportForm) {
-            reportForm.addEventListener('submit', async function(e) {
+            reportForm.addEventListener('submit', async function (e) {
                 e.preventDefault();
-                
+
                 const startDate = document.getElementById('startDate').value;
                 const endDate = document.getElementById('endDate').value;
-                
+
                 if (!startDate || !endDate) {
                     showNotification('Please select both start and end dates', true);
                     return;
                 }
-                
+
                 if (new Date(startDate) > new Date(endDate)) {
                     showNotification('Start date cannot be after end date', true);
                     return;
                 }
 
                 await updateDates(startDate, endDate);
+                window.location.reload();
             });
         }
 
@@ -98,49 +111,28 @@
         window.initialEndDate = document.getElementById('endDate').value;
     });
 
-    // Update date change event listeners to use the new updateDates function
-    document.getElementById('startDate').addEventListener('change', function() {
-        const startDate = this.value;
-        const endDate = document.getElementById('endDate').value;
-        if (startDate && endDate && startDate !== window.initialStartDate) {
-            document.getElementById('reportDateForm').dispatchEvent(new Event('submit'));
-        }
-    });
-
-    document.getElementById('endDate').addEventListener('change', function() {
-        const startDate = document.getElementById('startDate').value;
-        const endDate = this.value;
-        if (startDate && endDate && endDate !== window.initialEndDate) {
-            document.getElementById('reportDateForm').dispatchEvent(new Event('submit'));
-        }
-    });
-
     function showNotification(message, isError = false) {
         const container = document.getElementById('notificationContainer');
         const notification = document.createElement('div');
         notification.className = `alert ${isError ? 'alert-danger' : 'alert-success'}`;
         notification.textContent = message;
-        
+
         container.innerHTML = '';
         container.appendChild(notification);
-        
+
         setTimeout(() => {
             notification.remove();
         }, 3000);
     }
 </script>
 
-
-
 <h1 style="text-align: center; font-size: 36px;">FinOps Overview</h1>
+<div style="display: flex; justify-content: space-between; align-items: center;">
+    <div></div> <!-- Empty div for spacing -->
+    <img src="{{asset '/exivity-logo.png'}}" alt="Exivity Logo" style="height: 50px; margin-right: 20px;">
+</div>
 
 <br>
-
-<!--
-<h1>Exivity Instance</h1>
-<iframe id="loginFrame" src="{{exivityUrl}}" title="Exivity Instance" width="100%" height="600px" frameborder="0"></iframe>
-
-<!-- <script src="{{asset "/exivity.js"}}" nonce="{{nonce ""}}" ></script> -->
 
 <!-- HTML for the date controls -->
 <div id="notificationContainer" class="mb-4"></div>
@@ -153,7 +145,7 @@
             <button type="button" class="btn btn-default" data-range="30">Last 30 Days</button>
             <button type="button" class="btn btn-default" data-range="90">Last 90 Days</button>
         </div>
-        
+
         <!-- Custom date range form -->
         <form id="reportDateForm" class="flex items-center space-x-4">
             <div class="form-group">
@@ -181,7 +173,9 @@
                 <th>Current Status</th>
                 <th>Service</th>
                 <th>Rate</th>
+                <th>Interval</th>
                 <th>Total Quantity</th>
+                <th>Unit</th>
                 <th>Total COGS</th>
                 <th>Total Charge</th>
             </tr>
@@ -189,16 +183,18 @@
         <tbody>
             {{#each reportData.meta.report}}
                 {{#if account_key}}
-                        <tr>
-                            <td>{{account_key}}</td>
-                            <td>{{account_name}}</td>
-                            <td>{{../instance.status}}</td>
-                            <td>{{service_description}}</td>
-                            <td>{{avg_unit_based_rate}}</td>
-                            <td>{{total_quantity}}</td>
-                            <td>{{total_cogs}}</td>
-                            <td>{{total_charge}}</td>
-                        </tr>
+                    <tr>
+                        <td>{{account_key}}</td>
+                        <td>{{account_name}}</td>
+                        <td>{{../instance.status}}</td>
+                        <td>{{service_description}}</td>
+                        <td>{{avg_unit_based_rate}}</td>
+                        <td>{{service_interval}}</td>
+                        <td>{{total_quantity}}</td>
+                        <td>{{service_unit_label}}</td>
+                        <td>{{total_cogs}}</td>
+                        <td>{{total_charge}}</td>
+                    </tr>
                 {{/if}}
             {{/each}}
         </tbody>
@@ -220,10 +216,7 @@
     </div>
 {{/if}}
 
-
-<div>
-
-</div>
+<div></div>
 
 <div style="text-align: center; margin-top: 20px;">
     <a href="{{exivityUrl}}" target="_blank" class="pretty-button">

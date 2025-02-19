@@ -1,88 +1,235 @@
-<h1 style="text-align: center; font-size: 36px;">FinOps Analytics Dashboard</h1>
+<script nonce="{{nonce}}" type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+<script nonce="{{nonce}}">
+    google.charts.load('current', { 'packages': ['corechart'] });
+    google.charts.setOnLoadCallback(drawCharts);
 
+    function drawCharts() {
+        drawChart('analytics-chart-services', {{{chartData}}});
+        drawChart('analytics-chart-categories', {{{categoryChartData}}});
+    }
+
+    function drawChart(elementId, chartData) {
+        const data = google.visualization.arrayToDataTable(chartData.data);
+        const options = {
+            ...chartData.options,
+            legend: 'none',
+            chartArea: {
+                width: '80%',
+                height: '80%'
+            }
+        };
+        const chart = new google.visualization.PieChart(document.getElementById(elementId));
+        chart.draw(data, options);
+        generateLegend(chartData, elementId);
+    }
+
+    function generateLegend(chartData, elementId) {
+        const legendContainer = document.querySelector(`#${elementId}-legend`);
+        const colors = chartData.options.colors;
+        const data = chartData.data.slice(1); // Exclude headers
+        let legendHTML = '<table class="chart-legend-table">';
+
+        data.forEach((row, index) => {
+            const color = colors[index % colors.length]; // Wrap colors if more rows than colors
+            legendHTML += `
+                                <tr>
+                                        <td class="legend-cell"><div style="background-color: ${color}; width: 20px; height: 20px;"></div></td>
+                                        <td>${row[0]}</td>
+                                        <td class="number-cell">$${row[1].toFixed(2)}</td>
+                                </tr>
+                        `;
+        });
+
+        legendHTML += '</table>';
+        legendContainer.innerHTML = legendHTML;
+    }
+</script>
+<script nonce="{{nonce}}">
+    Handlebars.registerHelper('lookup', function(obj, index) {
+        return obj && Array.isArray(obj) ? obj[index] : null;
+    });
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const reportForm = document.getElementById('reportDateForm');
+        const quickSelectButtons = document.querySelectorAll('[data-range]');
+        const storedStartDate = sessionStorage.getItem('analyticsTabStartDate');
+        const storedEndDate = sessionStorage.getItem('analyticsTabEndDate');
+        const startDateInput = document.getElementById('startDate');
+        const endDateInput = document.getElementById('endDate');
+
+        if (storedStartDate && storedEndDate && (storedStartDate != startDateInput.value && storedEndDate != endDateInput.value)) {
+            startDateInput.value = storedStartDate;
+            endDateInput.value = storedEndDate;
+            
+            // Immediately trigger a report update with stored dates
+            updateDates(storedStartDate, storedEndDate);
+            showNotification('Reload to update report data');
+        }
+
+        // Function to format date as YYYY-MM-DD
+        function formatDate(date) {
+            return date.toISOString().split('T')[0];
+        }
+
+        // Function to calculate date range
+        function calculateDateRange(days) {
+            const endDate = new Date();
+            const startDate = new Date();
+            startDate.setDate(startDate.getDate() - days);
+            return {
+                startDate: formatDate(startDate),
+                endDate: formatDate(endDate)
+            };
+        }
+
+        async function updateDates(startDate, endDate) {
+            try {
+                // Store dates in sessionStorage for persistence between page loads
+                sessionStorage.setItem('analyticsTabStartDate', startDate);
+                sessionStorage.setItem('analyticsTabEndDate', endDate);
+                
+                const response = await fetch(`/plugin/ExivityPluginController/dates?startDate=${startDate}&endDate=${endDate}&reportCode=finops-analytics`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    }
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showNotification('Date range updated successfully');
+                } else {
+                    //showNotification(result.msg || 'Failed to update date range', true);
+                    //window.location.reload();
+                }
+            } catch (error) {
+                console.error('Error updating dates:', error);
+
+            }
+        }
+
+        // Add click handlers for quick select buttons
+        quickSelectButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const days = parseInt(this.dataset.range);
+                const dates = calculateDateRange(days);
+                
+                // Update input fields
+                document.getElementById('startDate').value = dates.startDate;
+                document.getElementById('endDate').value = dates.endDate;
+                
+                // Trigger the update
+                updateDates(dates.startDate, dates.endDate);
+                window.location.reload();
+            });
+        });
+
+        // Handle form submission for custom date range
+        if (reportForm) {
+            reportForm.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                
+                const startDate = document.getElementById('startDate').value;
+                const endDate = document.getElementById('endDate').value;
+                
+                if (!startDate || !endDate) {
+                    showNotification('Please select both start and end dates', true);
+                    return;
+                }
+                
+                if (new Date(startDate) > new Date(endDate)) {
+                    showNotification('Start date cannot be after end date', true);
+                    return;
+                }
+
+                await updateDates(startDate, endDate);
+                window.location.reload();
+            });
+        }
+
+        // Store initial date values
+        window.initialStartDate = document.getElementById('startDate').value;
+        window.initialEndDate = document.getElementById('endDate').value;
+    });
+
+    function showNotification(message, isError = false) {
+        const container = document.getElementById('notificationContainer');
+        const notification = document.createElement('div');
+        notification.className = `alert ${isError ? 'alert-danger' : 'alert-success'}`;
+        notification.textContent = message;
+        
+        container.innerHTML = '';
+        container.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.remove();
+        }, 3000);
+    }
+</script>
+
+<h1 style="text-align: center; font-size: 36px;">FinOps Analytics Dashboard</h1>
+<div style="display: flex; justify-content: space-between; align-items: center;">
+    <div></div> <!-- Empty div for spacing -->
+    <img src="{{asset '/exivity-logo.png'}}" alt="Exivity Logo" style="height: 50px; margin-right: 20px;">
+</div>
 <br>
 
 {{#if authSuccess}}
 <div class="break-container intro-stats">
-			<div class="count-stats">
-				
-					<div class="stats-container">
-						<span class="big-stat">
-							
-								1
-							
-						</span>
-						<div class="stat-label">Placeholder</div>
-					</div>
-				
-					<div class="stats-container">
-						<span class="big-stat">
-							
-								$460
-							
-						</span>
-						<div class="stat-label">Placeholder</div>
-					</div>
-				
-					<div class="stats-container">
-						<span class="big-stat">
-							
-								$579
-							
-						</span>
-						<div class="stat-label">Placeholder</div>
-					</div>
-				
-					<div class="stats-container">
-						<span class="big-stat">
-							
-								1
-							
-						</span>
-						<div class="stat-label">Placeholder</div>
-					</div>
-				
-					<div class="stats-container">
-						<span class="big-stat">
-							
-								1
-							
-						</span>
-						<div class="stat-label">Placeholder</div>
-					</div>
-				
-			</div>
-		</div>
+    <div class="count-stats">
+        <div class="stats-container">
+            <span class="big-stat">
+                {{metrics.uniqueInstances}}
+            </span>
+            <div class="stat-label">Unique Instance Accounts</div>
+        </div>
 
-<div class="buffer-container">
-  <h3 class="center">Total Cost By Service</h3>
-  <div 
-    class="auto-google-pie-chart" 
-    data-chart="{{chartData}}" 
-    data-target="analytics-chart-services" 
-    data-code="services"
-  >
-    <div id="analytics-chart-services" style="width: 280px; height: 280px;"></div>
-  </div>
-  <div class="chart-legend">
-    <table class="chart-legend-table">
-      <tbody>
-        {{#each serviceCosts}}
-          <tr>
-            <td class="legend-cell">
-              <div style="background-color:#396ab1;"></div>
-            </td>
-            <td>{{this.[0]}}</td>
-            <td class="number-cell">${{this.[1]}}</td>
-          </tr>
-        {{/each}}
-      </tbody>
-    </table>
-  </div>
+        <div class="stats-container">
+            <span class="big-stat">
+                {{metrics.uniqueServices}}
+            </span>
+            <div class="stat-label">Unique Services</div>
+        </div>
+
+        <div class="stats-container">
+            <span class="big-stat">
+                ${{metrics.totalCOGS}}
+            </span>
+            <div class="stat-label">Sum of COGS</div>
+        </div>
+
+        <div class="stats-container">
+            <span class="big-stat">
+                ${{metrics.totalCharges}}
+            </span>
+            <div class="stat-label">Sum of Charges</div>
+        </div>
+    </div>
 </div>
 <br>
+<div class="row">
+    <div class="col-md-6">
+        <h3 class="center">Total Charges By Service</h3>
+        <div class="auto-google-pie-chart">
+            <div id="analytics-chart-services" style="width: 280px; height: 280px; margin: 0 auto;"></div>
+            <div id="analytics-chart-services-legend" class="chart-legend" style="margin-top: 1px;"></div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <h3 class="center">Total Charges By Category</h3>
+        <div class="auto-google-pie-chart">
+            <div id="analytics-chart-categories" style="width: 280px; height: 280px; margin: 0 auto;"></div>
+            <div id="analytics-chart-categories-legend" class="chart-legend" style="margin-top: 1px;"></div>
+        </div>
+    </div>
+</div>
+<br>
+
 {{/if}}
 
+<br>
 <div id="notificationContainer" class="mb-4"></div>
 
 <div class="date-controls mb-4">
@@ -109,12 +256,9 @@
     </div>
 </div>
 
-
-
 <br>
 
 {{#if authSuccess}}
-
     <h2>FinOps Report Data</h2>
     <table class="table table-bordered table-striped">
         <thead>
@@ -123,7 +267,9 @@
                 <th>Instance Name</th>
                 <th>Service</th>
                 <th>Rate</th>
+                <th>Interval</th>
                 <th>Total Quantity</th>
+                <th>Unit</th>
                 <th>Total COGS</th>
                 <th>Total Charge</th>
             </tr>
@@ -136,7 +282,9 @@
                         <td>{{account_name}}</td>
                         <td>{{service_description}}</td>
                         <td>{{avg_unit_based_rate}}</td>
+                        <td>{{service_interval}}</td>
                         <td>{{total_quantity}}</td>
+                        <td>{{service_unit_label}}</td>
                         <td>{{total_cogs}}</td>
                         <td>{{total_charge}}</td>
                     </tr>
@@ -144,7 +292,6 @@
             {{/each}}
         </tbody>
     </table>
-
 {{else}}
     <div class="alert alert-danger">
         <strong>Authentication Error</strong>
@@ -162,141 +309,36 @@
     </div>
 {{/if}}
 
-<script>
-    (function() {
-        document.addEventListener('DOMContentLoaded', function() {
-            const reportForm = document.getElementById('reportDateForm');
-            const quickSelectButtons = document.querySelectorAll('[data-range]');
-            
-            // Function to format date as YYYY-MM-DD
-            function formatDate(date) {
-                return date.toISOString().split('T')[0];
-            }
-
-            // Function to calculate date range
-            function calculateDateRange(days) {
-                const endDate = new Date();
-                const startDate = new Date();
-                startDate.setDate(startDate.getDate() - days);
-                return {
-                    startDate: formatDate(startDate),
-                    endDate: formatDate(endDate)
-                };
-            }
-
-            // Function to update dates
-            async function updateDates(startDate, endDate) {
-                try {
-                    const response = await fetch(`/plugin/ExivityPluginController/json`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Accept': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            startDate: startDate,
-                            endDate: endDate
-                        })
-                    });
-
-                    const result = await response.json();
-                    
-                    if (response.ok) {
-                        showNotification('Date range updated successfully');
-                        window.location.reload();
-                    } else {
-                        showNotification(result.msg || 'Failed to update date range', true);
-                    }
-                } catch (error) {
-                    console.error('Error updating dates:', error);
-                    showNotification('Error updating date range', true);
-                }
-            }
-
-            // Add click handlers for quick select buttons
-            quickSelectButtons.forEach(button => {
-                button.addEventListener('click', function() {
-                    const days = parseInt(this.dataset.range);
-                    const dates = calculateDateRange(days);
-                    
-                    document.getElementById('startDate').value = dates.startDate;
-                    document.getElementById('endDate').value = dates.endDate;
-                    
-                    updateDates(dates.startDate, dates.endDate);
-                });
-            });
-
-            // Handle form submission
-            if (reportForm) {
-                reportForm.addEventListener('submit', async function(e) {
-                    e.preventDefault();
-                    
-                    const startDate = document.getElementById('startDate').value;
-                    const endDate = document.getElementById('endDate').value;
-                    
-                    if (!startDate || !endDate) {
-                        showNotification('Please select both start and end dates', true);
-                        return;
-                    }
-                    
-                    if (new Date(startDate) > new Date(endDate)) {
-                        showNotification('Start date cannot be after end date', true);
-                        return;
-                    }
-
-                    await updateDates(startDate, endDate);
-                });
-            }
-        });
-
-        function showNotification(message, isError = false) {
-            const container = document.getElementById('notificationContainer');
-            const notification = document.createElement('div');
-            notification.className = `alert ${isError ? 'alert-danger' : 'alert-success'}`;
-            notification.textContent = message;
-            
-            container.innerHTML = '';
-            container.appendChild(notification);
-            
-            setTimeout(() => {
-                notification.remove();
-            }, 3000);
-        }
-    })();
-</script>
-
 <style>
-.intro-stats .count-stats {
-    display: -webkit-flex;
-    display: -moz-flex;
-    display: -ms-flexbox;
-    display: -ms-flex;
-    display: flex;
-    -webkit-flex-direction: row;
-    -moz-flex-direction: row;
-    -ms-flex-direction: row;
-    flex-direction: row;
-    -webkit-justify-content: space-around;
-    -moz-justify-content: space-around;
-    -ms-justify-content: space-around;
-    -ms-flex-pack: justify;
-    justify-content: space-around;
-}
+    .intro-stats .count-stats {
+        display: -webkit-flex;
+        display: -moz-flex;
+        display: -ms-flexbox;
+        display: -ms-flex;
+        display: flex;
+        -webkit-flex-direction: row;
+        -moz-flex-direction: row;
+        -ms-flex-direction: row;
+        flex-direction: row;
+        -webkit-justify-content: space-around;
+        -moz-justify-content: space-around;
+        -ms-justify-content: space-around;
+        justify-content: space-around;
+    }
 
-.intro-stats .count-stats div .big-stat {
-    text-align: center;
-    font-size: 32px;
-    padding-bottom: 0;
-    line-height: 35px;
-    display: block;
-    margin-top: 19px;
-}
+    .intro-stats .count-stats div .big-stat {
+        text-align: center;
+        font-size: 32px;
+        padding-bottom: 0;
+        line-height: 35px;
+        display: block;
+        margin-top: 19px;
+    }
 
-.intro-stats .count-stats div .stat-label {
-    font-size: 15px;
-    text-align: center;
-    text-transform: uppercase;
-    display: block;
-}
-
+    .intro-stats .count-stats div .stat-label {
+        font-size: 15px;
+        text-align: center;
+        text-transform: uppercase;
+        display: block;
+    }
 </style>

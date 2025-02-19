@@ -1,3 +1,6 @@
+//Copyright 2025 Exivity B.V.  
+//SPDX-License-Identifier: Apache-2.0  
+
 package com.exivity.tab
 
 import com.morpheusdata.core.Plugin
@@ -15,6 +18,11 @@ import groovy.util.logging.Slf4j
 class ExivityPluginController implements PluginController {
     Plugin plugin
     MorpheusContext morpheus
+    private static Map<String, Map> datePreferences = [
+        instances: [:],
+        reports: [:]
+    ] // Static map to store date preferences
+
 
     ExivityPluginController(Plugin plugin, MorpheusContext morpheus) {
         this.plugin = plugin
@@ -36,37 +44,54 @@ class ExivityPluginController implements PluginController {
 
 
     List<Route> getRoutes() {
-    log.error("RETURNING ROUTES")
+    log.info("RETURNING ROUTES")
     def routes = [
-        Route.build("/ExivityPluginController/dates", "updateDates", Permission.build("customTabPlugin", "full")), // /instances/:instanceId/dates
-        Route.build("/ExivityPluginController/json", "json", [Permission.build("customTabPlugin", "full")])
+        Route.build("/ExivityPluginController/dates", "updateDates", Permission.build("customTabPlugin", "full")) // /instances/:instanceId/dates
     ]
-    log.error("Final routes: ${routes}")
+
     return routes
     }
 
     def updateDates(ViewModel<Map> model) {
-        log.error("Handling date update request")
+        log.info("Handling date update request")
         try {
-            def instanceId = model.parameters.instanceId
-            def startDate = model.params.startDate
-            def endDate = model.params.endDate
+            def startDate = model.request.getParameter('startDate')
+            def endDate = model.request.getParameter('endDate')
+            def instanceId = model.request.getParameter('instanceId')
+            def reportCode = model.request.getParameter('reportCode')
             
-            if (!instanceId || !startDate || !endDate) {
-                return ServiceResponse.error("Missing required parameters")
+            log.info("startDate is '${startDate}' endDate  is '${endDate}' instanceId is '${instanceId}' reportCode is '${reportCode}'")
+
+            if (!startDate || !endDate) {
+                return ServiceResponse.error("Missing required parameters: startDate and endDate")
             }
 
-            def instance = morpheus.getInstanceService().get(instanceId.toLong()).blockingGet()
-            if (!instance) {
-                return ServiceResponse.error("Instance not found")
+            if (!instanceId && !reportCode) {
+                return ServiceResponse.error("Either instanceId or reportCode must be provided")
             }
 
-            // Update metadata using CustomTabProvider's method
-            def customTabProvider = plugin.getProviderByCode("exivity-custom-tab") as CustomTabProvider
-            customTabProvider.saveDatePreference(instance, startDate, endDate)
+            // Validate date format
+            try {
+                Date.parse('yyyy-MM-dd', startDate)
+                Date.parse('yyyy-MM-dd', endDate)
+            } catch (Exception e) {
+                return ServiceResponse.error("Invalid date format. Use YYYY-MM-DD")
+            }
+
+            // Store dates based on the context
+            if (instanceId) {
+                datePreferences.instances[instanceId] = [startDate: startDate, endDate: endDate]
+                log.info("Stored dates for instance ${instanceId}: start=${startDate}, end=${endDate}")
+            }
+            
+            if (reportCode) {
+                datePreferences.reports[reportCode] = [startDate: startDate, endDate: endDate]
+                log.info("Stored dates for report ${reportCode}: start=${startDate}, end=${endDate}")
+            }
 
             return ServiceResponse.success([
-                message: "Date preferences updated successfully",
+                success: true,
+                message: "Date range updated successfully",
                 startDate: startDate,
                 endDate: endDate
             ])
@@ -76,12 +101,14 @@ class ExivityPluginController implements PluginController {
         }
     }
 
-
-    def json(ViewModel<Map> model) {
-        log.error("Handling API data request")
-        println model
-        model.object.foo = "fizz"
-        return JsonResponse.of(model.object)
+    // Update the helper method to accept Map parameter
+    static Map getStoredDates(Map params = [:]) {
+        if (params.instanceId) {
+            return datePreferences.instances[params.instanceId]
+        } else if (params.reportCode) {
+            return datePreferences.reports[params.reportCode]
+        }
+        return null
     }
 
 }

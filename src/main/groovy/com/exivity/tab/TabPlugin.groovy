@@ -1,3 +1,6 @@
+//Copyright 2025 Exivity B.V.  
+//SPDX-License-Identifier: Apache-2.0  
+
 package com.exivity.tab
 
 import com.morpheusdata.core.Plugin
@@ -26,11 +29,10 @@ class TabPlugin extends Plugin {
 		// Register controller
         this.controllers.add(new ExivityPluginController(this, morpheus))
 
-		this.setName("FinOps plugin")
+		this.setName("Exivity FinOps Plugin")
 		this.setPermissions([Permission.build('Exivity Instance Tab','custom-instance-tab', [Permission.AccessType.none, Permission.AccessType.full])])
 		this.setRenderer(new HandlebarsRenderer(this.classLoader))
-		// Plugin settings the are used to configure the behavior of the plugin
-		// https://developer.morpheusdata.com/api/com/morpheusdata/model/OptionType.html
+
 		this.settings << new OptionType(
 			name: 'Exivity Endpoint',
 			code: 'exivityUrl',
@@ -70,18 +72,32 @@ class TabPlugin extends Plugin {
 			name: 'Report ID',
 			code: 'exivityReportID',
 			fieldName: 'exivityReportID',
+			defaultValue: '1',
 			displayOrder: 3,
 			fieldLabel: 'Morpheus Report ID',
 			helpText: 'Morpheus Report ID in Exivity',
 			required: true,
 			inputType: OptionType.InputType.TEXT
 		)
+
+		this.settings << new OptionType(
+			name: 'Report Depth',
+			code: 'exivityReportDepth',
+			fieldName: 'exivityReportDepth',
+			defaultValue: '3',
+			displayOrder: 4,
+			fieldLabel: 'Morpheus Report Depth',
+			helpText: 'Morpheus Instance Report Depth',
+			required: true,
+			inputType: OptionType.InputType.TEXT
+		)
+
 		    // Add date range settings
     	this.settings << new OptionType(
         	name: 'Default Date Range',
         	code: 'defaultDateRange',
         	fieldName: 'defaultDateRange',
-        	displayOrder: 4,
+        	displayOrder: 5,
         	fieldLabel: 'Default Report Date Range (days)',
         	helpText: 'Number of days to include in reports by default',
         	defaultValue: '30',
