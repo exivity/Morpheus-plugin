@@ -38,43 +38,7 @@ class CustomTabProvider extends AbstractInstanceTabProvider {
 
     CustomTabProvider(Plugin plugin, MorpheusContext context) {
         this.plugin = plugin
-        this.morpheus = context        
-        disableSslValidation() // Disable SSL certificate validation
-    }
-
-    void initialize() {
-        plugin.registerProvider(this)
-    }
-
-    // Method to disable SSL certificate validation
-    private void disableSslValidation() {
-        try {
-            // Create a trust manager that does not validate certificate chains
-            TrustManager[] trustAllCerts = [
-                new X509TrustManager() {
-                    public X509Certificate[] getAcceptedIssuers() { return null }
-                    public void checkClientTrusted(X509Certificate[] certs, String authType) {}
-                    public void checkServerTrusted(X509Certificate[] certs, String authType) {}
-                }
-            ] as TrustManager[]
-
-            // Install the all-trusting trust manager
-            SSLContext sc = SSLContext.getInstance("SSL")
-            sc.init(null, trustAllCerts, new java.security.SecureRandom())
-            HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory())
-
-            // Create all-trusting host name verifier
-            HostnameVerifier allHostsValid = new HostnameVerifier() {
-                public boolean verify(String hostname, SSLSession session) {
-                    return true
-                }
-            }
-
-            // Install the all-trusting host verifier
-            HttpsURLConnection.setDefaultHostnameVerifier(allHostsValid)
-        } catch (Exception e) {
-            log.error("Failed to disable SSL validation", e)
-        }
+        this.morpheus = context
     }
 
     private Map fetchReportData(String authToken, String reportId, String exivityUrl, String startDate, String endDate, String instanceId = null) {

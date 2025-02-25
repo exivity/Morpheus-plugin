@@ -152,57 +152,65 @@ class CustomAnalyticsProvider extends AbstractAnalyticsProvider {
                 if (reportResult.success) {
                     reportData = reportResult.data
 
-                    // Calculate metrics
-                    metrics = calculateAnalyticMetrics(reportData)
+                    // Check if reportData and its meta.report exist and are not empty
+                    if (reportData?.meta?.report) {
+                        // Calculate metrics
+                        metrics = calculateAnalyticMetrics(reportData)
 
-                    // Calculate total cost by service for chart
-                    def serviceCosts = [:] // Map to store service totals
-                    reportData.meta.report.each { entry ->
-                        if (entry.service_description && entry.total_charge) {
-                            def serviceName = entry.service_description
-                            def cost = entry.total_charge as BigDecimal
-                            serviceCosts[serviceName] = (serviceCosts[serviceName] ?: 0.0) + cost
+                        // Calculate total cost by service for chart
+                        def serviceCosts = [:] // Map to store service totals
+                        reportData.meta.report.each { entry ->
+                            if (entry.service_description && entry.total_charge) {
+                                def serviceName = entry.service_description
+                                def cost = entry.total_charge as BigDecimal
+                                serviceCosts[serviceName] = (serviceCosts[serviceName] ?: 0.0) + cost
+                            }
                         }
-                    }
 
-                    // Calculate total cost by service for chart
-                    def categoryCosts = [:] // Map to store service totals
-                    reportData.meta.report.each { entry ->
-                        if (entry.servicecategory_name && entry.total_charge) {
-                            def categoryName = entry.servicecategory_name
-                            def cost = entry.total_charge as BigDecimal
-                            categoryCosts[categoryName] = (categoryCosts[categoryName] ?: 0.0) + cost
+                        // Calculate total cost by service for chart
+                        def categoryCosts = [:] // Map to store service totals
+                        reportData.meta.report.each { entry ->
+                            if (entry.servicecategory_name && entry.total_charge) {
+                                def categoryName = entry.servicecategory_name
+                                def cost = entry.total_charge as BigDecimal
+                                categoryCosts[categoryName] = (categoryCosts[categoryName] ?: 0.0) + cost
+                            }
                         }
+
+                        // Format data for Google Charts
+                        def chartRows = []
+                        serviceCosts.each { service, cost ->
+                            chartRows << [service, cost]
+                        }
+
+                        def chartOptions = [
+                            legend                 : "none",
+                            sliceVisibilityThreshold: 0.005,
+                            chartArea              : [width: "80%", height: "80%"],
+                            colors                 : ["#396ab1", "#da7c30", "#3e9651", "#cc2529", "#535154", "#6b4c9a", "#922428", "#948b3d"]
+                        ]
+
+                        chartData = [
+                            data   : [["Service", "Cost"]] + chartRows,
+                            options: chartOptions
+                        ]
+
+                        // Format data for Google Charts for category costs
+                        def categoryChartRows = []
+                        categoryCosts.each { category, cost ->
+                            categoryChartRows << [category, cost]
+                        }
+
+                        categoryChartData = [
+                            data   : [["Category", "Cost"]] + categoryChartRows,
+                            options: chartOptions
+                        ]
+                    } else {
+                        log.warn("Report data is empty or malformed")
+                        metrics = [uniqueInstances: 0, uniqueServices: 0, totalCOGS: 0.0, totalCharges: 0.0]
+                        chartData = [data: [["Service", "Cost"]], options: [:]]
+                        categoryChartData = [data: [["Category", "Cost"]], options: [:]]
                     }
-
-                    // Format data for Google Charts
-                    def chartRows = []
-                    serviceCosts.each { service, cost ->
-                        chartRows << [service, cost]
-                    }
-
-                    def chartOptions = [
-                        legend                 : "none",
-                        sliceVisibilityThreshold: 0.005,
-                        chartArea              : [width: "80%", height: "80%"],
-                        colors                 : ["#396ab1", "#da7c30", "#3e9651", "#cc2529", "#535154", "#6b4c9a", "#922428", "#948b3d"]
-                    ]
-
-                    chartData = [
-                        data   : [["Service", "Cost"]] + chartRows,
-                        options: chartOptions
-                    ]
-
-                    // Format data for Google Charts for category costs
-                    def categoryChartRows = []
-                    categoryCosts.each { category, cost ->
-                        categoryChartRows << [category, cost]
-                    }
-
-                    categoryChartData = [
-                        data   : [["Category", "Cost"]] + categoryChartRows,
-                        options: chartOptions
-                    ]
                 } else {
                     reportError = reportResult.errorMessage
                 }
@@ -211,6 +219,17 @@ class CustomAnalyticsProvider extends AbstractAnalyticsProvider {
             // Convert the chart data to JSON strings
             String formattedChartData = new JsonBuilder(chartData).toString()
             String formattedCategoryChartData = new JsonBuilder(categoryChartData).toString()
+
+            // Add safety checks for chart data processing
+            def processedServiceCosts = []
+            if (chartData?.data && chartData.data.size() > 1) {
+                processedServiceCosts = chartData.data[1..-1]
+            }
+
+            def processedCategoryCosts = []
+            if (categoryChartData?.data && categoryChartData.data.size() > 1) {
+                processedCategoryCosts = categoryChartData.data[1..-1]
+            }
 
             return ServiceResponse.success([
                 exivityUrl       : exivityUrl,
@@ -223,9 +242,11 @@ class CustomAnalyticsProvider extends AbstractAnalyticsProvider {
                 reportData       : reportData,
                 reportError      : reportError,
                 chartData        : formattedChartData,
-                serviceCosts     : chartData.data ? chartData.data[1..-1] : [],
+                // Safe array slicing with null check and size verification
+                serviceCosts     : (chartData?.data?.size() ?: 0) > 1 ? chartData.data[1..-1] : [],
                 categoryChartData: formattedCategoryChartData,
-                categoryCosts    : categoryChartData.data ? categoryChartData.data[1..-1] : [],
+                // Safe array slicing with null check and size verification
+                categoryCosts    : (categoryChartData?.data?.size() ?: 0) > 1 ? categoryChartData.data[1..-1] : [],
                 metrics          : metrics
             ])
         } catch (Exception e) {
@@ -238,6 +259,9 @@ class CustomAnalyticsProvider extends AbstractAnalyticsProvider {
     HTMLResponse renderTemplate(User user, Map<String, Object> data, Map<String, Object> opts) {
         ViewModel<Map> model = new ViewModel<>()
 
+        if (data == null) {
+            data = [:]
+        }
         // Get nonce from web request service
         String nonce = morpheus.getWebRequest().getNonceToken()
         data.nonce = nonce
