@@ -374,7 +374,7 @@ class CustomTabProvider extends AbstractInstanceTabProvider {
         csp.scriptSrc = "'self' 'strict-dynamic' https://*"
         csp.frameSrc = "'self' https://*"
         csp.imgSrc = "'self' https://*"
-        csp.styleSrc = "'self' 'unsafe-inline'"
+        csp.styleSrc = "'self'"
         csp.connectSrc = "'self' https://www.gstatic.com"
         csp
     }
