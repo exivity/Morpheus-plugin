@@ -105,6 +105,19 @@ class TabPlugin extends Plugin {
         	inputType: OptionType.InputType.NUMBER
     	)
 
+		// Add Currency Code
+    	this.settings << new OptionType(
+        	name: 'Default Currency',
+        	code: 'defaultCurrencyCode',
+        	fieldName: 'defaultCurrencyCode',
+        	displayOrder: 7,
+        	fieldLabel: 'Default Currency code',
+        	helpText: 'Default Currency code',
+        	defaultValue: 'USD',
+        	required: true,
+        	inputType: OptionType.InputType.TEXT
+    	)
+
 	}
 
 	@Override

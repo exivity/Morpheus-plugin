@@ -228,6 +228,7 @@ class CustomTabProvider extends AbstractInstanceTabProvider {
             String exivityUsername = settingsJson?.exivityUsername ?: ''
             String exivityPassword = settingsJson?.exivityPassword ?: ''
             String reportId = settingsJson?.exivityReportID ?: ''
+            String currencyCode = settingsJson?.defaultCurrencyCode ?: 'USD'
 
             // Get dates from controller's static map
             def storedDates = ExivityPluginController.getStoredDates(instanceId: instance.id?.toString())
@@ -267,7 +268,8 @@ class CustomTabProvider extends AbstractInstanceTabProvider {
                 endDate          : endDate,
                 reportData       : reportData,
                 reportError      : reportError,
-                pluginCode       : getCode()
+                pluginCode       : getCode(),
+                currencyCode     : currencyCode
             ]
 
             log.info(" '${getRenderer().getTemplateLoaders()}'")
@@ -294,7 +296,8 @@ class CustomTabProvider extends AbstractInstanceTabProvider {
                 authErrorMessage : "System error: ${e.message}",
                 authResponseCode : 0,
                 reportData       : null,
-                reportError      : "Failed to fetch report data: ${e.message}"
+                reportError      : "Failed to fetch report data: ${e.message}",
+                currencyCode     : 'USD'
             ]
 
             return getRenderer().renderTemplate("hbs/instanceTab", model)

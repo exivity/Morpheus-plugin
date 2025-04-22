@@ -127,6 +127,7 @@ class CustomAnalyticsProvider extends AbstractAnalyticsProvider {
             String exivityUsername = settingsJson?.exivityUsername ?: ''
             String exivityPassword = settingsJson?.exivityPassword ?: ''
             String reportId = settingsJson?.exivityReportID ?: ''
+            String currencyCode = settingsJson?.defaultCurrencyCode ?: 'USD'
 
             // Get stored dates or use defaults
             def storedDates = ExivityPluginController.getStoredDates(reportCode: 'finops-analytics')
@@ -247,7 +248,8 @@ class CustomAnalyticsProvider extends AbstractAnalyticsProvider {
                 categoryChartData: formattedCategoryChartData,
                 // Safe array slicing with null check and size verification
                 categoryCosts    : (categoryChartData?.data?.size() ?: 0) > 1 ? categoryChartData.data[1..-1] : [],
-                metrics          : metrics
+                metrics          : metrics,
+                currencyCode     : currencyCode
             ])
         } catch (Exception e) {
             log.error("Error loading analytics data", e)
