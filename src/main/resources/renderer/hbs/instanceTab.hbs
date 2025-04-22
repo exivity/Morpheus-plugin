@@ -164,11 +164,11 @@
 <br>
 
 {{#if authSuccess}}
-    <h2>FinOps Report Data for Instance {{instance.getUuid}}</h2>
+    <h2>FinOps Report Data for Instance {{instance.getDisplayName}}</h2>
     <table class="table table-bordered table-striped">
         <thead>
             <tr>
-                <th>Instance Key</th>
+                <!-- <th>Instance Key</th> -->
                 <th>Instance Name</th>
                 <th>Current Status</th>
                 <th>Service</th>
@@ -184,16 +184,36 @@
             {{#each reportData.meta.report}}
                 {{#if account_key}}
                     <tr>
-                        <td>{{account_key}}</td>
+                        <!-- <td>{{account_key}}</td> -->
                         <td>{{account_name}}</td>
                         <td>{{../instance.status}}</td>
                         <td>{{service_description}}</td>
-                        <td>{{avg_unit_based_rate}}</td>
+                        <td>
+                            <script nonce="{{nonce}}">
+                                document.currentScript.parentNode.textContent =
+                                    parseFloat("{{avg_unit_based_rate}}").toFixed(6) + " {{currencyCode}}";
+                            </script>
+                        </td>
                         <td>{{service_interval}}</td>
-                        <td>{{total_quantity}}</td>
+                        <td>
+                            <script nonce="{{nonce}}">
+                                document.currentScript.parentNode.textContent =
+                                    parseFloat("{{total_quantity}}").toFixed(3);
+                            </script>
+                        </td>
                         <td>{{service_unit_label}}</td>
-                        <td>{{total_cogs}}</td>
-                        <td>{{total_charge}}</td>
+                        <td>
+                            <script nonce="{{nonce}}">
+                                document.currentScript.parentNode.textContent =
+                                    parseFloat("{{total_cogs}}").toFixed(3) + " {{currencyCode}}";
+                            </script>
+                        </td>
+                        <td>
+                            <script nonce="{{nonce}}">
+                                document.currentScript.parentNode.textContent =
+                                    parseFloat("{{total_charge}}").toFixed(3) + " {{currencyCode}}";
+                            </script>
+                        </td>
                     </tr>
                 {{/if}}
             {{/each}}
